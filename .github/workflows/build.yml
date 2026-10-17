@@ -1,35 +1,32 @@
-name: Build TradeSpark APK
-
+# Build TradeSpark APK: installs Android cmdline-tools, accepts licenses, builds APK and uploads artifacts.
+# Adjust api-level / build-tools version and signing steps as needed.
 on:
   push:
-    branches: [ main, master ]
+    branches:
+      - main
+      - develop
   pull_request:
-    branches: [ main, master ]
+    branches:
+      - main
+      - develop
 
 jobs:
   build:
+    name: Build APK
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java JDK 17
-        uses: actions/setup-java@v5
+      - name: Set up Java (required by Gradle)
+        uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: temurin
+          java-version: 11
 
-      - name: Set up Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Install npm deps
-        run: npm install
-
-      - name: Build Web App (Vite)
-        run: npm run build
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
 
       - name: Cache Gradle
         uses: actions/cache@v4
@@ -37,49 +34,44 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/android/gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
 
-      - name: Install Android SDK components
-        run: |
-          set -e
-          export ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT
-          yes | sdkmanager --licenses || true
-          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
-        shell: bash
+      - name: Set up Android SDK (cmdline-tools + build-tools + platform-tools)
+        uses: r0adkll/setup-android@v2
+        with:
+          api-level: 33
+          components: |
+            platform-tools
+            build-tools;33.0.0
+            cmdline-tools;latest
 
-      - name: Setup Capacitor & Android platform
+      - name: Ensure sdkmanager is on PATH and accept licenses
+        # r0adkll/setup-android installs cmdline-tools; use that path to accept licenses
         run: |
-          set -e
-          npm install @capacitor/core @capacitor/cli @capacitor/android --no-save
-          if [ ! -f "capacitor.config.json" ] && [ ! -f "capacitor.config.ts" ]; then
-            npx cap init TradeSpark com.tradespark.app --web-dir dist
+          if [ -d "$ANDROID_HOME/cmdline-tools/latest/bin" ]; then
+            export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
+          elif [ -d "$ANDROID_HOME/tools/bin" ]; then
+            export PATH="$ANDROID_HOME/tools/bin:$PATH"
           fi
-          if [ ! -d "android" ]; then
-            npx cap add android
-          fi
-          npx cap sync android
-        shell: bash
+          yes | sdkmanager --licenses
 
-      - name: Ensure gradlew is executable
+      - name: Print Android SDK info
         run: |
-          set -e
-          if [ -f android/gradlew ]; then
-            chmod +x android/gradlew
-          fi
-        shell: bash
+          echo "ANDROID_HOME = $ANDROID_HOME"
+          sdkmanager --version || true
+          adb --version || true
 
-      - name: Build Android Debug APK
-        run: |
-          set -e
-          cd android
-          ./gradlew assembleDebug --no-daemon --stacktrace
-        shell: bash
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --no-daemon
 
-      - name: Upload Debug APK
+      - name: Build release APK (unsigned)
+        # If you have signing configured with secrets, run the signed assembleRelease instead.
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: TradeSpark-Debug-APK
-          path: android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
+          name: tradespark-apks
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/release/*.apk
