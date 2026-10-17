@@ -1,0 +1,23 @@
+Build status: FAILURE
+Repository: GitBash-cloud/TradeSpark-v1
+Run: https://github.com/GitBash-cloud/TradeSpark-v1/actions/runs/39030283023
+Job: 117389189408
+Step: 8 — sdkmanager not found; exit code 127
+Timestamp: 2026-10-17T11:51:46Z
+
+Details:
+The CI job failed because the script attempted to run the Android SDK's `sdkmanager` but the command was not available on the runner's PATH ("sdkmanager: command not found"). This typically means the Android command-line tools were not installed or ANDROID_SDK_ROOT/ANDROID_HOME and PATH were not set before calling `sdkmanager`.
+
+Suggested fixes:
+- Add an Android setup step to the workflow, for example:
+  uses: r0adkll/setup-android@v2
+  with:
+    api-level: 33
+    components: |
+      platform-tools
+      build-tools;33.0.0
+      cmdline-tools;latest
+- Ensure `cmdline-tools/*/bin` (or `tools/bin`) is on PATH and ANDROID_SDK_ROOT is set.
+- Alternatively use a runner or action that already provides the Android SDK.
+
+Created-by: GitHub Copilot (automated CI note)
