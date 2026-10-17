@@ -44,9 +44,10 @@ jobs:
       - name: Install Android commandline tools and SDK
         run: |
           set -e
+
+          export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}"
           mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
 
-          # Remove any stale SDK directory so the move won't fail
           rm -rf "$ANDROID_SDK_ROOT/cmdline-tools/latest"
           rm -rf "$ANDROID_SDK_ROOT/cmdline-tools-temp"
 
@@ -58,8 +59,12 @@ jobs:
           rm -rf commandlinetools.zip cmdline-tools-temp
 
           export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
-          yes | sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" "platform-tools" "platforms;android-33" "build-tools;33.0.2"
-          yes | sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --licenses
+
+          # Install required packages without piping 'yes'
+          sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+
+          # Accept licenses non-interactively
+          yes | sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --licenses || true
         shell: bash
 
       - name: Setup Capacitor & Android platform
